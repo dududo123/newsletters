@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R&D본부 소식지</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar" id="topbarEl">
+    <img id="topbarBgImg" src="" alt="">
+    <div class="brand">
+      <div class="brand-mark" id="brandMark">R&D</div>
+      <div>
+        <h1>R&D본부 소식지</h1>
+        <div class="sub">롯데케미칼 R&amp;D본부</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="settingsBtn" title="설정">⚙</button>
+  </header>
+
+  <main id="viewport">
+    <div id="noticeBanner"></div>
+
+    <div class="dashboard-grid">
+
+      <!-- 좌측 컬럼: 중식 샐러드 신청공간 + 매월 소식지 -->
+      <div class="dashboard-col">
+
+        <div class="space-card" id="card-salad">
+          <div class="space-card-head">
+            <h3><span class="emoji">🥗</span> <span id="saladTitle">중식 샐러드 신청공간</span></h3>
+            <div class="space-card-actions">
+              <button class="icon-btn-sm" id="saladSearchToggle" title="검색">🔍</button>
+              <button class="btn btn-primary btn-sm" id="newSaladBtn">새 포스트 ▾</button>
+            </div>
+          </div>
+          <div class="news-search-row" id="saladSearchRow" style="display:none;">
+            <input type="text" id="saladSearchInput" placeholder="제목으로 검색">
+          </div>
+          <div class="space-card-body">
+            <div class="news-list" id="saladList"></div>
+            <div class="news-more-row" id="saladMoreRow"></div>
+          </div>
+        </div>
+
+        <div class="space-card photo-card" id="card-newsletter">
+          <div class="space-card-head">
+            <h3><span class="emoji">📰</span> <span id="newsletterTitle">소식지</span></h3>
+            <div class="space-card-actions">
+              <button class="btn btn-primary btn-sm" id="newsUploadBtn">＋ 사진 추가</button>
+            </div>
+          </div>
+          <div class="space-card-body" id="newsSliderBody"></div>
+        </div>
+
+      </div>
+
+      <!-- 우측 컬럼: 식단표 + 밀박스 -->
+      <div class="dashboard-col">
+
+        <div class="space-card photo-card" id="card-mealplan">
+          <div class="space-card-head">
+            <h3><span class="emoji">🍽️</span> <span id="mealplanTitle">식단표</span></h3>
+            <div class="space-card-actions">
+              <button class="btn btn-primary btn-sm" data-category="mealplan" data-action="upload">＋ 업로드</button>
+            </div>
+          </div>
+          <div class="space-card-body" id="galleryBody-mealplan"></div>
+        </div>
+
+        <div class="space-card photo-card" id="card-mealbox">
+          <div class="space-card-head">
+            <h3><span class="emoji">🍱</span> <span id="mealboxTitle">밀박스</span></h3>
+            <div class="space-card-actions">
+              <button class="btn btn-primary btn-sm" data-category="mealbox" data-action="upload">＋ 업로드</button>
+            </div>
+          </div>
+          <div class="space-card-body" id="galleryBody-mealbox"></div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="app-footer">R&amp;D본부 소식지 · 롯데케미칼 R&amp;D본부 · 관리자: R&amp;D인사팀</footer>
+</div>
+
+<!-- 이미지 업로드 모달 (식단표/밀박스 공용, 사진 1장만 유지) -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal-box">
+    <button type="button" class="modal-close" data-close="uploadModal">×</button>
+    <h3 id="uploadModalTitle">사진 업로드</h3>
+    <p class="desc" id="uploadModalDesc">사진을 1장만 등록할 수 있으며, 새로 업로드하면 기존 사진은 자동으로 교체됩니다.</p>
+    <form id="uploadForm">
+      <div class="field">
+        <label>사진 선택 <span class="hint">(1장만 업로드 가능 · 기존 사진 자동 교체)</span></label>
+        <label class="file-drop" id="uploadDropZone">
+          <input type="file" id="uploadFileInput" accept="image/*">
+          📷 클릭하거나 사진을 끌어다 놓으세요
+        </label>
+        <div class="preview-grid" id="uploadPreviewGrid"></div>
+      </div>
+      <div class="field">
+        <label>인증코드</label>
+        <input type="password" id="uploadCodeInput" placeholder="업로드 인증코드를 입력하세요" required>
+      </div>
+      <div id="uploadFormStatus"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" data-close="uploadModal">취소</button>
+        <button type="submit" class="btn btn-primary" id="uploadSubmitBtn">업로드</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 소식지 사진 추가 모달 -->
+<div class="modal-overlay" id="newsUploadModal">
+  <div class="modal-box">
+    <button type="button" class="modal-close" data-close="newsUploadModal">×</button>
+    <h3>소식지 사진 추가</h3>
+    <p class="desc" id="newsUploadModalDesc">사진을 여러 장 선택해서 슬라이더에 추가하세요. (최대 20장까지 보관 가능)</p>
+    <form id="newsUploadForm">
+      <div class="field">
+        <label>사진 선택 <span class="hint">(여러 장 선택 가능)</span></label>
+        <label class="file-drop" id="newsUploadDropZone">
+          <input type="file" id="newsUploadFileInput" accept="image/*" multiple>
+          📷 클릭하거나 사진을 끌어다 놓으세요
+        </label>
+        <div class="preview-grid" id="newsUploadPreviewGrid"></div>
+      </div>
+      <div class="field">
+        <label>인증코드</label>
+        <input type="password" id="newsUploadCodeInput" placeholder="업로드 인증코드를 입력하세요" required>
+      </div>
+      <div id="newsUploadFormStatus"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" data-close="newsUploadModal">취소</button>
+        <button type="submit" class="btn btn-primary" id="newsUploadSubmitBtn">추가하기</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 중식 샐러드 새 글 작성 모달 -->
+<div class="modal-overlay" id="saladModal">
+  <div class="modal-box wide">
+    <button type="button" class="modal-close" data-close="saladModal">×</button>
+    <h3>중식 샐러드 신청공간 - 새 글 작성</h3>
+    <p class="desc">제목·내용·사진을 입력해서 등록하세요.</p>
+    <form id="saladForm">
+      <div class="field">
+        <label>제목</label>
+        <input type="text" id="saladTitleInput" placeholder="예) 8/28 중식 샐러드 - 그릭요거트 콥샐러드" required>
+      </div>
+      <div class="field">
+        <label>작성자 <span class="hint">(선택)</span></label>
+        <input type="text" id="saladAuthorInput" placeholder="예) 남승두">
+      </div>
+      <div class="field">
+        <label>내용</label>
+        <textarea id="saladContentInput" placeholder="내용을 입력하세요."></textarea>
+      </div>
+      <div class="field">
+        <label>사진 업로드 <span class="hint">(여러 장 선택 가능, 최대 8장)</span></label>
+        <label class="file-drop" id="saladDropZone">
+          <input type="file" id="saladFileInput" accept="image/*" multiple>
+          📷 클릭하거나 사진을 끌어다 놓으세요
+        </label>
+        <div class="preview-grid" id="saladPreviewGrid"></div>
+      </div>
+      <div class="field">
+        <label>인증코드</label>
+        <input type="password" id="saladCodeInput" placeholder="발행 인증코드를 입력하세요" required>
+      </div>
+      <div id="saladFormStatus"></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" data-close="saladModal">취소</button>
+        <button type="submit" class="btn btn-primary" id="saladSubmitBtn">발행하기</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 소식지/샐러드 상세보기 모달 -->
+<div class="modal-overlay" id="postDetailModal">
+  <div class="modal-box wide">
+    <button type="button" class="modal-close" data-close="postDetailModal">×</button>
+    <div id="postDetailBody"></div>
+  </div>
+</div>
+
+<!-- 인증코드 확인 모달 (삭제 등 단순 확인용) -->
+<div class="modal-overlay" id="passModal">
+  <div class="modal-box">
+    <button type="button" class="modal-close" data-close="passModal">×</button>
+    <h3 id="passModalTitle">인증코드 확인</h3>
+    <p class="desc" id="passModalDesc">계속하려면 인증코드를 입력해주세요.</p>
+    <div class="pin-row">
+      <input type="password" id="passModalInput" placeholder="인증코드" autocomplete="off">
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn btn-ghost" id="passModalCancel">취소</button>
+      <button type="button" class="btn btn-primary" id="passModalConfirm">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 모달 -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box wide">
+    <button type="button" class="modal-close" data-close="settingsModal">×</button>
+    <h3>설정</h3>
+    <div class="settings-tabs">
+      <button data-pane="appearance" class="active">사이트 꾸미기</button>
+      <button data-pane="titles">섹션 제목</button>
+      <button data-pane="code">인증코드 변경</button>
+    </div>
+
+    <div class="settings-pane active" id="pane-appearance">
+      <div class="settings-note">
+        프로필 사진(로고 자리)과 상단 배경 사진은 <b>이 설정 화면에서만</b> 변경할 수 있습니다. 변경 시 인증코드 확인이 필요합니다. 이 사이트는 서버(Netlify)에 저장되므로, 저장하면 <b>모든 방문자에게 즉시 반영</b>됩니다.
+      </div>
+
+      <div class="appearance-block">
+        <h4>프로필 사진 (로고 자리)</h4>
+        <p class="desc-sm">상단 "R&D본부 소식지" 옆의 둥근 사각형에 표시됩니다.</p>
+        <div class="appearance-preview-row">
+          <div class="appearance-preview-avatar" id="avatarPreview">R&D</div>
+          <div style="flex:1;">
+            <label class="file-drop" id="avatarDropZone" style="padding:14px;">
+              <input type="file" id="avatarFileInput" accept="image/*">
+              📷 클릭해서 사진 선택
+            </label>
+          </div>
+        </div>
+        <div class="btn-row" style="justify-content:flex-start; margin-top:6px;">
+          <button type="button" class="btn btn-primary btn-sm" id="saveAvatarBtn">프로필 사진 저장</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="resetAvatarBtn">기본값으로</button>
+        </div>
+        <div id="avatarStatus"></div>
+      </div>
+
+      <div class="appearance-block">
+        <h4>사이트 배경 사진 (상단 배너)</h4>
+        <p class="desc-sm">슬라이더로 위치와 확대 정도를 조정해서 원하는 부분이 보이도록 맞출 수 있습니다.</p>
+        <div class="appearance-preview-bg" id="bgPreview">
+          <img id="bgPreviewImg" src="" alt="">
+          <span class="placeholder-text" id="bgPreviewPlaceholder">설정된 배경 사진이 없습니다 (기본 그라데이션 사용 중)</span>
+        </div>
+        <label class="file-drop" id="bgDropZone" style="padding:14px;">
+          <input type="file" id="bgFileInput" accept="image/*">
+          🖼️ 클릭해서 새 사진 선택
+        </label>
+
+        <div class="bg-adjust-row" style="margin-top:14px;">
+          <label>가로 위치 <span class="val" id="bgPosXVal">50%</span></label>
+          <input type="range" id="bgPosXInput" min="0" max="100" value="50">
+          <label>세로 위치 <span class="val" id="bgPosYVal">50%</span></label>
+          <input type="range" id="bgPosYInput" min="0" max="100" value="50">
+          <label>확대 <span class="val" id="bgZoomVal">100%</span></label>
+          <input type="range" id="bgZoomInput" min="100" max="250" value="100">
+        </div>
+
+        <div class="btn-row" style="justify-content:flex-start; margin-top:6px;">
+          <button type="button" class="btn btn-primary btn-sm" id="saveBgBtn">배경 사진 저장</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="resetBgBtn">기본값으로</button>
+        </div>
+        <div id="bgStatus"></div>
+      </div>
+    </div>
+
+    <div class="settings-pane" id="pane-titles">
+      <div class="settings-note">
+        각 섹션의 제목을 원하는 문구로 바꿀 수 있습니다. 비워두고 저장하면 기본 제목으로 되돌아갑니다.
+      </div>
+      <div class="field">
+        <label>중식 샐러드 신청공간</label>
+        <input type="text" id="titleSaladInput" placeholder="중식 샐러드 신청공간">
+      </div>
+      <div class="field">
+        <label>소식지</label>
+        <input type="text" id="titleNewsInput" placeholder="소식지">
+      </div>
+      <div class="field">
+        <label>식단표</label>
+        <input type="text" id="titleMealplanInput" placeholder="식단표">
+      </div>
+      <div class="field">
+        <label>밀박스</label>
+        <input type="text" id="titleMealboxInput" placeholder="밀박스">
+      </div>
+      <div id="settingsTitlesStatus"></div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary btn-sm" id="saveTitlesBtn">제목 저장</button>
+      </div>
+    </div>
+
+    <div class="settings-pane" id="pane-code">
+      <div class="settings-note">
+        인증코드를 변경하려면 <b>현재 사용 중인 인증코드</b>를 먼저 정확히 입력해야 합니다.
+      </div>
+      <div class="field">
+        <label>현재 인증코드</label>
+        <input type="password" id="currentCodeInput" placeholder="현재 인증코드 입력">
+      </div>
+      <div class="field">
+        <label>새 인증코드</label>
+        <input type="password" id="newCodeInput" placeholder="새 인증코드 입력">
+      </div>
+      <div class="field">
+        <label>새 인증코드 확인</label>
+        <input type="password" id="newCodeConfirmInput" placeholder="다시 한 번 입력">
+      </div>
+      <div id="settingsCodeStatus"></div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary btn-sm" id="changeCodeBtn">변경하기</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn btn-ghost" data-close="settingsModal">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 라이트박스 -->
+<div class="lightbox" id="lightbox">
+  <button class="close-btn" id="lightboxClose">×</button>
+  <button class="lightbox-nav-btn prev" id="lightboxPrev">‹</button>
+  <img id="lightboxImg" src="" alt="">
+  <button class="lightbox-nav-btn next" id="lightboxNext">›</button>
+  <div class="lightbox-counter" id="lightboxCounter"></div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
