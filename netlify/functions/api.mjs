@@ -7,7 +7,8 @@
 //     section-titles / auth / migration-status / stats
 //     ★ meal-photos      : 식단표·밀박스 사진 1번/2번 [{slot,imageId,date}]
 //     ★ untag-records    : 사원증 미태그 식사등록 [{id,empNo,name,date,at}]  (3개월 지나면 자동 삭제)
-//     ★ guest-meals      : 외부인 식사신청 [{id,empNo,name,dept,company,count,reason,status,createdAt,approvedAt}]
+//     ★ guest-meals      : 외부인 식사신청
+//                          [{id,empNo,name,dept,company,count,mealDate,reason,status,createdAt,approvedAt}]
 //   [이미지 store "rnd-images"]  <imgId> : 바이너리 이미지
 //
 // ★ 조회수(stats) ★
@@ -15,12 +16,7 @@
 //     slides:{<id>:{total,daily}}, posts:{...}, updatedAt }
 //   일별 기록(daily)을 쌓아두고, 조회 시 일/주/월 단위로 묶어서 제공합니다.
 //
-// ★ 외부인 식사신청 알림 메일 (선택) ★
-//   Netlify 사이트 설정 > Environment variables 에 아래 값을 넣으면 서버가 직접 메일을 보냅니다.
-//     RESEND_API_KEY   : Resend(resend.com) API 키
-//     GUEST_MAIL_TO    : 받는 사람 (기본값 20220412@lottechem.com)
-//     GUEST_MAIL_FROM  : 보내는 사람 (기본값 onboarding@resend.dev)
-//   값이 없으면 메일은 화면 쪽(Netlify Forms 알림)으로 보냅니다.
+// [v6 변경] 외부인 식사신청: 식사일자(mealDate) 추가 · 관리자 삭제 기능 · 알림 메일 기능 제거
 
 import { getStore } from "@netlify/blobs";
 
@@ -29,7 +25,6 @@ const DEFAULT_CODE = "1234";
 const STATS_DAILY_KEEP_DAYS = 400;   // 월별 1년치를 보려면 넉넉히 보관
 const VALID_SECTIONS = new Set(["news", "salad", "mealplan", "mealbox"]);
 const UNTAG_KEEP_MONTHS = 3;
-const GUEST_MAIL_TO_DEFAULT = "20220412@lottechem.com";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -66,13 +61,14 @@ async function verifyCode(store, code) {
 function todayKST() {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
-function envGet(name) {
-  try { if (typeof Netlify !== "undefined" && Netlify.env && Netlify.env.get(name)) return Netlify.env.get(name); } catch (e) {}
-  return (typeof process !== "undefined" && process.env && process.env[name]) || "";
-}
 function maskName(n) { n = String(n || ""); return n.length <= 1 ? n : n.length === 2 ? n[0] + "*" : n[0] + "*".repeat(n.length - 2) + n[n.length - 1]; }
 function maskEmp(e) { e = String(e || ""); return e.length <= 4 ? e[0] + "*".repeat(Math.max(e.length - 1, 0)) : e.slice(0, 2) + "*".repeat(e.length - 4) + e.slice(-2); }
 function cleanText(v, max) { return String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max); }
+function isValidDate(v) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v || "")) return false;
+  const d = new Date(v + "T00:00:00Z");
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
 
 /* ============================================================
    이미지
@@ -675,36 +671,16 @@ async function handleUntag(req, url, store, subpath, sub2) {
 }
 
 /* ============================================================
-   ★ 외부인 식사신청
+   ★ 외부인 식사신청  (v6: 식사일자 추가 · 관리자 삭제 · 메일 기능 없음)
    ============================================================ */
-async function sendGuestMail(rec, adminUrl) {
-  const key = envGet("RESEND_API_KEY");
-  if (!key) return "skipped";
-  const to = envGet("GUEST_MAIL_TO") || GUEST_MAIL_TO_DEFAULT;
-  const from = envGet("GUEST_MAIL_FROM") || "R&D본부 소식지 <onboarding@resend.dev>";
-  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const when = new Date(rec.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
-  const row = (k, v) => `<tr><th style="text-align:left;padding:6px 10px;background:#F7E9E9;width:110px">${k}</th><td style="padding:6px 10px">${esc(v)}</td></tr>`;
-  const html = `<div style="font-family:'Malgun Gothic',sans-serif;font-size:14px;color:#2B2422">
-    <h2 style="color:#9C1E22;margin:0 0 12px">🍽 외부인 식사 신청이 접수되었습니다</h2>
-    <table style="border-collapse:collapse;border:1px solid #E6DFDA">${row("신청 시간", when)}${row("사번", rec.empNo)}${row("이름", rec.name)}${row("부서", rec.dept)}${row("외부업체", rec.company)}${row("식사 인원", rec.count + "명")}${row("방문 사유", rec.reason)}</table>
-    <p style="margin:18px 0"><a href="${esc(adminUrl)}" style="background:#9C1E22;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">관리자 페이지에서 승인하기</a></p>
-    <p style="font-size:12px;color:#756B67">링크: ${esc(adminUrl)}</p></div>`;
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject: `[외부인 식사신청] ${rec.dept} ${rec.name} · ${rec.company} ${rec.count}명`, html }),
-    });
-    if (!res.ok) { console.error("[메일 발송 실패]", res.status, await res.text().catch(() => "")); return "failed"; }
-    return "sent";
-  } catch (e) { console.error("[메일 발송 오류]", e); return "failed"; }
-}
 async function handleGuestMeal(req, url, store, subpath, sub2) {
   if (req.method === "GET" && subpath === "list") {
     const list = await readJSON(store, "guest-meals", []);
     const items = list.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 300)
-      .map((r) => ({ id: r.id, empNo: maskEmp(r.empNo), name: maskName(r.name), dept: r.dept, company: r.company, count: r.count, reason: r.reason, status: r.status }));
+      .map((r) => ({
+        id: r.id, empNo: maskEmp(r.empNo), name: maskName(r.name), dept: r.dept, company: r.company,
+        count: r.count, mealDate: r.mealDate || "", reason: r.reason, status: r.status,
+      }));
     return json({ count: list.length, items });
   }
   if (req.method === "POST" && !subpath) {
@@ -716,6 +692,7 @@ async function handleGuestMeal(req, url, store, subpath, sub2) {
       dept: cleanText(body.dept, 40),
       company: cleanText(body.company, 60),
       count: parseInt(body.count, 10),
+      mealDate: cleanText(body.mealDate, 10),
       reason: cleanText(body.reason, 300),
       status: "pending",
       createdAt: new Date().toISOString(),
@@ -726,13 +703,12 @@ async function handleGuestMeal(req, url, store, subpath, sub2) {
     if (!rec.dept) return err("부서를 입력해주세요.", 400);
     if (!rec.company) return err("외부업체명을 입력해주세요.", 400);
     if (!Number.isFinite(rec.count) || rec.count < 1 || rec.count > 100) return err("식사 인원수는 1~100명으로 입력해주세요.", 400);
+    if (!isValidDate(rec.mealDate)) return err("식사일자를 선택해주세요.", 400);
     if (!rec.reason) return err("방문 사유를 입력해주세요.", 400);
     const list = await readJSON(store, "guest-meals", []);
     list.push(rec);
     await store.setJSON("guest-meals", list);
-    const adminUrl = /^https?:\/\//.test(body.adminUrl || "") ? body.adminUrl : `${url.origin}/?admin=guest`;
-    const mail = await sendGuestMail(rec, adminUrl);
-    return json({ ok: true, id: rec.id, mail, record: { ...rec } }, 201);
+    return json({ ok: true, id: rec.id, mail: "skipped", record: { ...rec } }, 201);
   }
   if (req.method === "POST" && subpath === "admin") {
     const body = await readBody(req);
@@ -746,6 +722,17 @@ async function handleGuestMeal(req, url, store, subpath, sub2) {
       rec.approvedAt = rec.status === "approved" ? new Date().toISOString() : null;
       await store.setJSON("guest-meals", list);
       return json({ ok: true, record: rec });
+    }
+    if (sub2 === "delete") {
+      let next;
+      if (body.all === true) next = [];
+      else {
+        const ids = new Set(Array.isArray(body.ids) ? body.ids : []);
+        if (!ids.size) return err("삭제할 신청 건을 선택해주세요.", 400);
+        next = list.filter((r) => !ids.has(r.id));
+      }
+      await store.setJSON("guest-meals", next);
+      return json({ ok: true, deleted: list.length - next.length });
     }
   }
   return err("지원하지 않는 요청입니다.", 405);
