@@ -1,12 +1,7 @@
+# R&D본부 소식지 — Netlify 설정
 [build]
-  publish = "public"
-  functions = "netlify/functions"
+  publish = "public"              # 화면 파일 폴더
+  functions = "netlify/functions" # 서버(API) 파일 폴더
 
 [functions]
   node_bundler = "esbuild"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "SAMEORIGIN"
-    X-Content-Type-Options = "nosniff"
