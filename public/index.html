@@ -1,10 +1,50 @@
 <!DOCTYPE html>
+<!-- ★ 버전: v5 (2026-11-05) · v4 + 식단표·밀박스 통합 · 미태그 식사등록 · 외부인 식사신청 ★ -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>R&D본부 소식지</title>
-<link rel="stylesheet" href="/css/style.css">
+<!-- ?v= 는 브라우저가 예전 파일을 캐시해서 쓰지 않도록 하는 버전 표시입니다 -->
+<link rel="stylesheet" href="/css/style.css?v=20261105">
+<style>
+/* 조회수 화면 디자인 (style.css 버전과 관계없이 항상 적용) */
+.stats-period-tabs{display:flex;gap:6px;margin-bottom:14px;background:#F6F4F2;border:1px solid #E6DFDA;border-radius:10px;padding:4px}
+.stats-period-btn{flex:1;min-width:0;padding:8px 6px;border:none;border-radius:7px;background:transparent;color:#756B67;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
+.stats-period-btn:hover{background:#fff;color:#7A1519}
+.stats-period-btn.active{background:#9C1E22;color:#fff}
+.stats-cards{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.stats-card{flex:1 1 140px;min-width:0;background:#fff;border:1px solid #E6DFDA;border-radius:12px;padding:14px 16px;text-align:center}
+.stats-card.primary{background:#9C1E22;border-color:#9C1E22;color:#fff}
+.stats-card-label{font-size:12px;opacity:.85;margin-bottom:4px}
+.stats-card-num{font-size:26px;font-weight:800;line-height:1.2}
+.stats-h{font-size:13.5px;margin:18px 0 8px;color:#7A1519;padding-bottom:6px;border-bottom:1px solid #E6DFDA}
+.stats-chart{display:flex;align-items:flex-end;gap:6px;height:130px;padding:8px 4px 0;background:#fff;border:1px solid #E6DFDA;border-radius:12px}
+.stats-bar-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;height:100%}
+.stats-bar-value{font-size:11px;font-weight:700;color:#756B67;margin-bottom:3px}
+.stats-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.stats-bar{width:70%;max-width:26px;border-radius:5px 5px 0 0;background:linear-gradient(to top,#9C1E22,#C0474B)}
+.stats-bar-label{font-size:10.5px;color:#756B67;margin-top:5px;white-space:nowrap}
+.stats-list{background:#fff;border:1px solid #E6DFDA;border-radius:12px;overflow:hidden}
+.stats-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #E6DFDA;font-size:13px}
+.stats-row:last-child{border-bottom:none}
+.stats-thumb{width:34px;height:34px;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid #E6DFDA}
+.stats-row-name{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats-row-today{font-size:11.5px;color:#756B67;flex-shrink:0;background:#F6F4F2;padding:2px 8px;border-radius:999px}
+.stats-row-total{font-weight:800;color:#9C1E22;flex-shrink:0;min-width:52px;text-align:right}
+.stats-note{font-size:11.5px;color:#756B67;line-height:1.6;background:#F6F4F2;border-radius:10px;padding:10px 12px;margin:14px 0 0}
+#passModal{z-index:1400}
+@media (max-width:640px){
+  .stats-period-btn{font-size:12.5px;padding:9px 4px}
+  .stats-card-num{font-size:22px}
+  .stats-chart{height:112px;gap:4px}
+  .stats-bar-label{font-size:9.5px}
+  .stats-row{font-size:12.5px;padding:9px 10px;gap:8px}
+  .stats-row-total{min-width:44px}
+  .settings-tabs button{min-width:0;flex:1 1 45%}
+}
+</style>
+<link rel="stylesheet" href="/css/meal.css?v=1">
 </head>
 <body>
 <div id="app">
@@ -23,12 +63,8 @@
 
   <main id="viewport">
     <div id="noticeBanner"></div>
-
     <div class="dashboard-grid">
-
-      <!-- 좌측 컬럼: 중식 샐러드 신청공간 + 매월 소식지 -->
       <div class="dashboard-col">
-
         <div class="space-card" id="card-salad">
           <div class="space-card-head">
             <h3><span class="emoji">🥗</span> <span id="saladTitle">중식 샐러드 신청공간</span></h3>
@@ -55,41 +91,71 @@
           </div>
           <div class="space-card-body" id="newsSliderBody"></div>
         </div>
-
       </div>
 
-      <!-- 우측 컬럼: 식단표 + 밀박스 -->
       <div class="dashboard-col">
-
-        <div class="space-card photo-card" id="card-mealplan">
+        <!-- ★ 식단표 · 밀박스 통합 카드 (meal.js) -->
+        <div class="space-card" id="card-meal">
           <div class="space-card-head">
-            <h3><span class="emoji">🍽️</span> <span id="mealplanTitle">식단표</span></h3>
-            <div class="space-card-actions">
-              <button class="btn btn-primary btn-sm" data-category="mealplan" data-action="upload">＋ 업로드</button>
-            </div>
+            <h3><span class="emoji">🍽️</span> <span id="mealplanTitle">식단표 · 밀박스</span></h3>
           </div>
-          <div class="space-card-body" id="galleryBody-mealplan"></div>
-        </div>
-
-        <div class="space-card photo-card" id="card-mealbox">
-          <div class="space-card-head">
-            <h3><span class="emoji">🍱</span> <span id="mealboxTitle">밀박스</span></h3>
-            <div class="space-card-actions">
-              <button class="btn btn-primary btn-sm" data-category="mealbox" data-action="upload">＋ 업로드</button>
-            </div>
+          <div class="space-card-body meal-body">
+            <input type="file" id="mealReplaceInput" accept="image/*" hidden>
+            <div id="mealPhotoBody"></div>
+            <!-- app.js 호환용 (예전 식단표/밀박스 자리 · 화면에는 보이지 않음) -->
+            <div id="galleryBody-mealplan" hidden></div>
+            <div id="galleryBody-mealbox" hidden></div>
+            <div class="meal-divider"></div>
+            <section class="mealbox-section" id="mealboxSection">
+              <div class="mealbox-head"><h4>🍱 <span id="mealboxTitle">밀박스</span></h4>
+                <button type="button" class="btn btn-outline btn-sm" id="untagPopupBtn">🪪 등록 팝업 열기</button></div>
+              <div class="mb-tabs" role="tablist">
+                <button type="button" class="active" data-mb="untag" role="tab" aria-selected="true">🪪 사원증 미태그 식사등록</button>
+                <button type="button" data-mb="guest" role="tab" aria-selected="false">👥 외부인 식사 신청</button>
+              </div>
+              <div class="mb-pane active" id="mb-untag" role="tabpanel">
+                <form class="untag-form" id="untagForm" autocomplete="off" novalidate>
+                  <input type="text" id="untagEmpNo" placeholder="사번" maxlength="12" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" aria-label="사번">
+                  <input type="text" id="untagName" placeholder="이름" maxlength="20" autocomplete="off" enterkeyhint="done" aria-label="이름">
+                  <button type="submit" class="btn btn-primary" id="untagSubmitBtn">등록</button>
+                </form>
+                <p class="untag-info">사원증을 태그하지 못한 경우 사번·이름을 등록해주세요. 등록 날짜는 자동으로 기록되며, 이 목록은 <b>매일 0시에 새로 시작</b>됩니다.</p>
+                <div id="untagStatus" class="untag-status" aria-live="polite"></div>
+                <div class="untag-box">
+                  <div class="untag-box-head"><span id="untagTodayLabel">오늘 등록 현황</span><span class="count" id="untagCount">0명</span></div>
+                  <div class="untag-cols"><span>No</span><span>사번</span><span>이름</span></div>
+                  <div class="untag-list" id="untagList" tabindex="0" aria-label="오늘 등록 현황 목록"></div>
+                  <div class="untag-more hidden" id="untagMore"></div>
+                </div>
+              </div>
+              <div class="mb-pane" id="mb-guest" role="tabpanel">
+                <div class="gm-layout">
+                  <div class="gm-side">
+                    <button type="button" class="btn btn-primary gm-open-btn" id="gmOpenBtn">＋ 외부인 식사 신청<small>사번·업체·인원 입력</small></button>
+                    <p class="gm-side-note">신청하면 담당자에게 알림이 가고, 승인되면 신청 목록의 <b>승인여부</b>가 바뀝니다.</p>
+                  </div>
+                  <div class="gm-box">
+                    <div class="gm-box-head"><span>신청 목록 (최신순)</span><span class="count" id="gmCount">0건</span></div>
+                    <div class="gm-list-wrap" id="gmListWrap" tabindex="0" aria-label="외부인 식사 신청 목록">
+                      <table class="gm-table">
+                        <thead><tr><th>사번</th><th>이름</th><th>부서</th><th>외부업체</th><th>식사인원수</th><th>방문사유</th><th>승인여부</th></tr></thead>
+                        <tbody id="gmListBody"><tr><td colspan="7"><div class="gm-empty">불러오는 중...</div></td></tr></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
-          <div class="space-card-body" id="galleryBody-mealbox"></div>
         </div>
-
       </div>
-
     </div>
   </main>
 
   <footer class="app-footer">R&amp;D본부 소식지 · 롯데케미칼 R&amp;D본부 · 관리자: R&amp;D인사팀</footer>
 </div>
 
-<!-- 이미지 업로드 모달 (식단표/밀박스 공용, 사진 1장만 유지) -->
+<!-- 이미지 업로드 모달 (식단표/밀박스) -->
 <div class="modal-overlay" id="uploadModal">
   <div class="modal-box">
     <button type="button" class="modal-close" data-close="uploadModal">×</button>
@@ -117,12 +183,78 @@
   </div>
 </div>
 
+<!-- ★ 사원증 미태그 식사등록 팝업 (사이트주소/?untag=1 로 접속하면 이 창만 전체화면) -->
+<div class="modal-overlay" id="untagPopup" role="dialog" aria-modal="true" aria-labelledby="upTitle">
+  <div class="modal-box">
+    <button type="button" class="modal-close" data-close="untagPopup" aria-label="닫기">×</button>
+    <div class="up-head">
+      <p class="t" id="upTitle">🪪 사원증 미태그 식사등록</p>
+      <div class="s">사원증을 태그하지 못했다면 사번과 이름을 등록해주세요.</div>
+      <span class="d" id="upDate">-</span>
+    </div>
+    <div class="up-body">
+      <form id="upForm" autocomplete="off" novalidate>
+        <div class="up-field"><label for="upEmpNo">사번</label>
+          <input type="text" id="upEmpNo" placeholder="사번 입력" maxlength="12" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"></div>
+        <div class="up-field"><label for="upName">이름</label>
+          <input type="text" id="upName" placeholder="이름 입력" maxlength="20" autocomplete="off" enterkeyhint="done"></div>
+        <div id="upStatus" aria-live="polite"></div>
+        <button type="submit" class="btn btn-primary up-submit" id="upSubmit">등록하기</button>
+      </form>
+      <div class="up-done" id="upDone" hidden aria-live="polite">
+        <div class="ok">✓</div>
+        <div class="msg" id="upDoneMsg">등록 완료!</div>
+        <div class="sub" id="upDoneSub"></div>
+        <div class="btn-row" style="justify-content:center">
+          <button type="button" class="btn btn-ghost" id="upAgain">다른 사람 등록</button>
+          <button type="button" class="btn btn-primary" id="upClose">닫기</button>
+        </div>
+      </div>
+      <div class="up-count" id="upCount"></div>
+    </div>
+  </div>
+</div>
+<!-- ★ 외부인 식사 신청 팝업 -->
+<div class="modal-overlay" id="guestMealModal" role="dialog" aria-modal="true" aria-labelledby="gmTitle">
+  <div class="modal-box">
+    <button type="button" class="modal-close" data-close="guestMealModal" aria-label="닫기">×</button>
+    <div class="up-head">
+      <p class="t" id="gmTitle">🍽 외부인 식사 신청</p>
+      <div class="s">외부 손님과 구내식당에서 식사할 때 신청해주세요. 신청 시간은 자동으로 기록됩니다.</div>
+    </div>
+    <div class="up-body">
+      <form id="gmForm" autocomplete="off" novalidate>
+        <div class="gm-form-grid">
+          <div class="up-field"><label for="gmEmpNo">사번</label><input type="text" id="gmEmpNo" maxlength="12" inputmode="numeric" autocapitalize="off" spellcheck="false" placeholder="사번"></div>
+          <div class="up-field"><label for="gmName">이름</label><input type="text" id="gmName" maxlength="20" placeholder="이름"></div>
+          <div class="up-field"><label for="gmDept">부서</label><input type="text" id="gmDept" maxlength="40" placeholder="예) 촉매팀"></div>
+          <div class="up-field"><label for="gmCompany">외부업체</label><input type="text" id="gmCompany" maxlength="60" placeholder="예) ○○화학"></div>
+          <div class="up-field"><label for="gmCountInput">식사 인원수</label><input type="number" id="gmCountInput" min="1" max="100" value="1" inputmode="numeric"></div>
+          <div class="up-field full"><label for="gmReason">방문 사유</label><textarea id="gmReason" maxlength="300" placeholder="예) 공동연구 미팅"></textarea></div>
+        </div>
+        <div id="gmStatus" aria-live="polite"></div>
+        <button type="submit" class="btn btn-primary up-submit" id="gmSubmit">신청하기</button>
+      </form>
+      <div class="up-done" id="gmDone" hidden aria-live="polite">
+        <div class="ok">✓</div>
+        <div class="msg" id="gmDoneMsg">신청 완료!</div>
+        <div class="sub" id="gmDoneSub"></div>
+        <div class="btn-row" style="justify-content:center"><button type="button" class="btn btn-primary" id="gmDoneClose">확인</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ★ 외부인 식사신청 알림 메일용 (Netlify Forms 가 이 폼을 인식해서 메일 알림을 보냄 · 화면에는 안 보임) -->
+<form name="guest-meal-notify" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input name="bot-field"><input name="empNo"><input name="name"><input name="dept"><input name="company">
+  <input name="count"><textarea name="reason"></textarea><input name="createdAt"><input name="adminLink">
+</form>
 <!-- 소식지 사진 추가 모달 -->
 <div class="modal-overlay" id="newsUploadModal">
   <div class="modal-box">
     <button type="button" class="modal-close" data-close="newsUploadModal">×</button>
     <h3>소식지 사진 추가</h3>
-    <p class="desc" id="newsUploadModalDesc">사진을 여러 장 선택해서 슬라이더에 추가하세요. (최대 20장까지 보관 가능)</p>
+    <p class="desc" id="newsUploadModalDesc">사진을 여러 장 선택해서 슬라이더에 추가하세요. (최대 50장까지 보관 가능)</p>
     <form id="newsUploadForm">
       <div class="field">
         <label>사진 선택 <span class="hint">(여러 장 선택 가능)</span></label>
@@ -185,7 +317,7 @@
   </div>
 </div>
 
-<!-- 소식지/샐러드 상세보기 모달 -->
+<!-- 상세보기 모달 -->
 <div class="modal-overlay" id="postDetailModal">
   <div class="modal-box wide">
     <button type="button" class="modal-close" data-close="postDetailModal">×</button>
@@ -193,7 +325,7 @@
   </div>
 </div>
 
-<!-- 인증코드 확인 모달 (삭제 등 단순 확인용) -->
+<!-- 인증코드 확인 모달 -->
 <div class="modal-overlay" id="passModal">
   <div class="modal-box">
     <button type="button" class="modal-close" data-close="passModal">×</button>
@@ -215,16 +347,18 @@
     <button type="button" class="modal-close" data-close="settingsModal">×</button>
     <h3>설정</h3>
     <div class="settings-tabs">
-      <button data-pane="appearance" class="active">사이트 꾸미기</button>
-      <button data-pane="titles">섹션 제목</button>
-      <button data-pane="code">인증코드 변경</button>
+      <button type="button" data-pane="appearance" class="active">사이트 꾸미기</button>
+      <button type="button" data-pane="titles">섹션 제목</button>
+      <button type="button" data-pane="stats">📊 조회수</button>
+      <button type="button" data-pane="untag">🪪 미태그 식사기록</button>
+      <button type="button" data-pane="guest">🍽 외부인 식사신청</button>
+      <button type="button" data-pane="code">인증코드 변경</button>
     </div>
 
     <div class="settings-pane active" id="pane-appearance">
       <div class="settings-note">
-        프로필 사진(로고 자리)과 상단 배경 사진은 <b>이 설정 화면에서만</b> 변경할 수 있습니다. 변경 시 인증코드 확인이 필요합니다. 이 사이트는 서버(Netlify)에 저장되므로, 저장하면 <b>모든 방문자에게 즉시 반영</b>됩니다.
+        프로필 사진(로고 자리)과 상단 배경 사진은 <b>이 설정 화면에서만</b> 변경할 수 있습니다. 변경 시 인증코드 확인이 필요합니다.
       </div>
-
       <div class="appearance-block">
         <h4>프로필 사진 (로고 자리)</h4>
         <p class="desc-sm">상단 "R&D본부 소식지" 옆의 둥근 사각형에 표시됩니다.</p>
@@ -255,7 +389,6 @@
           <input type="file" id="bgFileInput" accept="image/*">
           🖼️ 클릭해서 새 사진 선택
         </label>
-
         <div class="bg-adjust-row" style="margin-top:14px;">
           <label>가로 위치 <span class="val" id="bgPosXVal">50%</span></label>
           <input type="range" id="bgPosXInput" min="0" max="100" value="50">
@@ -264,7 +397,6 @@
           <label>확대 <span class="val" id="bgZoomVal">100%</span></label>
           <input type="range" id="bgZoomInput" min="100" max="250" value="100">
         </div>
-
         <div class="btn-row" style="justify-content:flex-start; margin-top:6px;">
           <button type="button" class="btn btn-primary btn-sm" id="saveBgBtn">배경 사진 저장</button>
           <button type="button" class="btn btn-ghost btn-sm" id="resetBgBtn">기본값으로</button>
@@ -277,47 +409,35 @@
       <div class="settings-note">
         각 섹션의 제목을 원하는 문구로 바꿀 수 있습니다. 비워두고 저장하면 기본 제목으로 되돌아갑니다.
       </div>
-      <div class="field">
-        <label>중식 샐러드 신청공간</label>
-        <input type="text" id="titleSaladInput" placeholder="중식 샐러드 신청공간">
-      </div>
-      <div class="field">
-        <label>소식지</label>
-        <input type="text" id="titleNewsInput" placeholder="소식지">
-      </div>
-      <div class="field">
-        <label>식단표</label>
-        <input type="text" id="titleMealplanInput" placeholder="식단표">
-      </div>
-      <div class="field">
-        <label>밀박스</label>
-        <input type="text" id="titleMealboxInput" placeholder="밀박스">
-      </div>
+      <div class="field"><label>중식 샐러드 신청공간</label><input type="text" id="titleSaladInput" placeholder="중식 샐러드 신청공간"></div>
+      <div class="field"><label>소식지</label><input type="text" id="titleNewsInput" placeholder="소식지"></div>
+      <div class="field"><label>식단표 · 밀박스 (카드 제목)</label><input type="text" id="titleMealplanInput" placeholder="식단표 · 밀박스"></div>
+      <div class="field"><label>밀박스 (카드 안 소제목)</label><input type="text" id="titleMealboxInput" placeholder="밀박스"></div>
       <div id="settingsTitlesStatus"></div>
       <div class="btn-row" style="margin-top:8px;">
-        <button class="btn btn-primary btn-sm" id="saveTitlesBtn">제목 저장</button>
+        <button type="button" class="btn btn-primary btn-sm" id="saveTitlesBtn">제목 저장</button>
       </div>
     </div>
 
+    <!-- 조회수 탭 -->
+    <div class="settings-pane" id="pane-stats">
+      <div id="statsContent"><div class="empty-mini">조회수를 불러오는 중...</div></div>
+    </div>
+
+    <!-- ★ 미태그 식사기록 (meal.js가 채움) -->
+    <div class="settings-pane" id="pane-untag"><div id="untagAdminBody"></div></div>
+    <!-- ★ 외부인 식사신청 (meal.js가 채움) -->
+    <div class="settings-pane" id="pane-guest"><div id="guestAdminBody"></div></div>
     <div class="settings-pane" id="pane-code">
       <div class="settings-note">
         인증코드를 변경하려면 <b>현재 사용 중인 인증코드</b>를 먼저 정확히 입력해야 합니다.
       </div>
-      <div class="field">
-        <label>현재 인증코드</label>
-        <input type="password" id="currentCodeInput" placeholder="현재 인증코드 입력">
-      </div>
-      <div class="field">
-        <label>새 인증코드</label>
-        <input type="password" id="newCodeInput" placeholder="새 인증코드 입력">
-      </div>
-      <div class="field">
-        <label>새 인증코드 확인</label>
-        <input type="password" id="newCodeConfirmInput" placeholder="다시 한 번 입력">
-      </div>
+      <div class="field"><label>현재 인증코드</label><input type="password" id="currentCodeInput" placeholder="현재 인증코드 입력"></div>
+      <div class="field"><label>새 인증코드</label><input type="password" id="newCodeInput" placeholder="새 인증코드 입력"></div>
+      <div class="field"><label>새 인증코드 확인</label><input type="password" id="newCodeConfirmInput" placeholder="다시 한 번 입력"></div>
       <div id="settingsCodeStatus"></div>
       <div class="btn-row" style="margin-top:8px;">
-        <button class="btn btn-primary btn-sm" id="changeCodeBtn">변경하기</button>
+        <button type="button" class="btn btn-primary btn-sm" id="changeCodeBtn">변경하기</button>
       </div>
     </div>
 
@@ -336,6 +456,144 @@
   <div class="lightbox-counter" id="lightboxCounter"></div>
 </div>
 
-<script src="/js/app.js"></script>
+
+<script src="/js/app.js?v=20261105"></script>
+<script>
+/* ============================================================
+   조회수 화면 (index.html 내장 버전)
+   ============================================================ */
+(function () {
+  var box = document.getElementById("statsContent");
+  var tabBtn = document.querySelector('.settings-tabs button[data-pane="stats"]');
+  if (!box || !tabBtn) return;
+
+  var period = "day";
+  var appJsIsNew = typeof window.refreshStatsPane === "function";
+
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  function img(id) { return typeof imageUrl === "function" ? imageUrl(id) : (id ? "/api/image/" + id : ""); }
+  function label(key) {
+    var map = { news: "newsletterTitle", salad: "saladTitle", mealplan: "mealplanTitle", mealbox: "mealboxTitle" };
+    var el = document.getElementById(map[key]);
+    var def = { news: "소식지", salad: "중식 샐러드 신청공간", mealplan: "식단표", mealbox: "밀박스" }[key];
+    return (el && el.textContent.trim()) || def;
+  }
+  function problem(title, detail, fix) {
+    box.innerHTML =
+      '<div class="status-msg error" style="line-height:1.7">' +
+      "<b>⚠️ " + esc(title) + "</b><br>" + esc(detail) +
+      (fix ? "<br><br><b>해결 방법:</b> " + fix : "") + "</div>" +
+      '<div class="btn-row" style="justify-content:flex-start"><button type="button" class="btn btn-ghost btn-sm" id="statsRetryBtn">🔄 다시 시도</button></div>';
+    document.getElementById("statsRetryBtn").onclick = render;
+  }
+
+  async function render() {
+    box.innerHTML = '<div class="empty-mini">불러오는 중...</div>';
+    var res, s;
+    try {
+      res = await fetch("/api/stats?period=" + period, { cache: "no-store" });
+    } catch (e) {
+      return problem("서버에 연결하지 못했습니다.", String(e && e.message || e), "인터넷 연결을 확인하고 다시 시도해주세요.");
+    }
+    try { s = await res.json(); } catch (e) { s = null; }
+
+    if (res.status === 404 || (s && s.error && /API 경로/.test(s.error))) {
+      return problem("서버 파일이 예전 버전입니다. (응답 " + res.status + ")",
+        (s && s.error) || "조회수 API(/api/stats)를 찾을 수 없습니다.",
+        "GitHub의 <code>netlify/functions/api.mjs</code> 파일을 최신 버전으로 교체해주세요. (저장소 최상위나 public 폴더가 아닌 <b>netlify/functions</b> 폴더입니다)");
+    }
+    if (!res.ok || !s) {
+      return problem("조회수를 불러오지 못했습니다. (응답 " + res.status + ")", (s && s.error) || "서버 응답을 해석할 수 없습니다.", "잠시 후 다시 시도해주세요.");
+    }
+    if (!s.site || !Array.isArray(s.site.trend)) {
+      return problem("서버 파일이 예전 버전입니다.", "기간별(일/주/월) 조회 기능이 없는 서버 응답입니다.",
+        "GitHub의 <code>netlify/functions/api.mjs</code> 파일을 최신 버전으로 교체해주세요.");
+    }
+
+    var pl = s.periodLabel || "오늘";
+    var tabs = [["day", "일자별"], ["week", "주별"], ["month", "월별"]].map(function (p) {
+      return '<button type="button" class="stats-period-btn' + (period === p[0] ? " active" : "") + '" data-period="' + p[0] + '">' + p[1] + "</button>";
+    }).join("");
+
+    var max = Math.max.apply(null, [1].concat(s.site.trend.map(function (d) { return d.count; })));
+    var chart = s.site.trend.map(function (d) {
+      var h = Math.max(Math.round(d.count / max * 100), 3);
+      return '<div class="stats-bar-col" title="' + esc(d.key) + ": " + d.count + '회">' +
+        '<div class="stats-bar-value">' + d.count + "</div>" +
+        '<div class="stats-bar-wrap"><div class="stats-bar" style="height:' + h + '%"></div></div>' +
+        '<div class="stats-bar-label">' + esc(d.label) + "</div></div>";
+    }).join("");
+    var chartTitle = period === "day" ? "최근 7일 방문 추이" : period === "week" ? "최근 8주 방문 추이" : "최근 6개월 방문 추이";
+
+    var sec = ["news", "salad", "mealplan", "mealbox"].map(function (k) {
+      var v = (s.sections && s.sections[k]) || { total: 0, current: 0 };
+      return '<div class="stats-row"><span class="stats-row-name">' + esc(label(k)) + "</span>" +
+        '<span class="stats-row-today">' + pl + " " + (v.current || 0) + "</span>" +
+        '<span class="stats-row-total">' + (v.total || 0) + "회</span></div>";
+    }).join("");
+
+    var slides = (s.slides || []).length ? s.slides.map(function (sl) {
+      return '<div class="stats-row"><img class="stats-thumb" src="' + img(sl.imageId) + '" alt="" loading="lazy">' +
+        '<span class="stats-row-name">' + sl.order + "번째 사진</span>" +
+        '<span class="stats-row-today">' + pl + " " + (sl.current || 0) + "</span>" +
+        '<span class="stats-row-total">' + (sl.total || 0) + "회</span></div>";
+    }).join("") : '<div class="empty-mini">등록된 소식지 사진이 없습니다.</div>';
+
+    box.innerHTML =
+      '<div class="stats-period-tabs">' + tabs + "</div>" +
+      '<div class="stats-cards">' +
+        '<div class="stats-card primary"><div class="stats-card-label">전체 방문</div><div class="stats-card-num">' + (s.site.total || 0).toLocaleString() + "</div></div>" +
+        '<div class="stats-card"><div class="stats-card-label">' + pl + ' 방문</div><div class="stats-card-num">' + (s.site.current || 0).toLocaleString() + "</div></div>" +
+      "</div>" +
+      '<h4 class="stats-h">' + chartTitle + '</h4><div class="stats-chart">' + chart + "</div>" +
+      '<h4 class="stats-h">섹션별 조회수</h4><div class="stats-list">' + sec + "</div>" +
+      '<h4 class="stats-h">소식지 사진별 조회수</h4><div class="stats-list">' + slides + "</div>" +
+      '<p class="stats-note">오른쪽 굵은 숫자는 <b>누적 전체</b>, 회색 표시는 <b>' + pl + "</b> 수치입니다.<br>" +
+      "방문은 하루 1회, 사진 조회는 30분에 1회까지만 집계됩니다." +
+      (appJsIsNew ? "" : "<br><span style=\"color:#B3261E\">※ app.js가 예전 버전이라 새 조회수가 기록되지 않을 수 있습니다. <code>public/js/app.js</code>를 교체해주세요.</span>") +
+      "</p>" +
+      '<div class="btn-row" style="justify-content:flex-start">' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="statsRefreshBtn">🔄 새로고침</button>' +
+        '<button type="button" class="btn btn-danger btn-sm" id="statsResetBtn">조회수 초기화</button>' +
+      '</div><div id="statsActionStatus"></div>';
+
+    Array.prototype.forEach.call(box.querySelectorAll(".stats-period-btn"), function (b) {
+      b.onclick = function () { if (period !== b.dataset.period) { period = b.dataset.period; render(); } };
+    });
+    document.getElementById("statsRefreshBtn").onclick = render;
+    document.getElementById("statsResetBtn").onclick = resetStats;
+  }
+
+  async function resetStats() {
+    if (!confirm("지금까지 기록된 조회수를 모두 0으로 되돌립니다. 계속할까요?")) return;
+    var code = typeof window.verifyPasscodeAndGet === "function"
+      ? await window.verifyPasscodeAndGet("조회수 초기화", "조회수를 초기화하려면 인증코드를 입력해주세요.")
+      : prompt("인증코드를 입력해주세요.");
+    if (!code) return;
+    var r = await fetch("/api/stats/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code }) });
+    if (!r.ok) { alert("초기화에 실패했습니다. 인증코드를 확인해주세요."); return; }
+    render();
+  }
+
+  window.refreshStatsPane = render;
+
+  tabBtn.addEventListener("click", function () {
+    Array.prototype.forEach.call(document.querySelectorAll(".settings-tabs button"), function (b) { b.classList.remove("active"); });
+    Array.prototype.forEach.call(document.querySelectorAll(".settings-pane"), function (p) { p.classList.remove("active"); });
+    tabBtn.classList.add("active");
+    document.getElementById("pane-stats").classList.add("active");
+    render();
+  });
+})();
+</script>
+
+<!-- 사진 확대(데스크탑) · 소식지 드래그 넘기기 · 사진 일괄 삭제 -->
+<script src="/js/news-enhance.js?v=1"></script>
+<!-- 공지 배너 · 이벤트 신청/설문 · 좋아요 -->
+<script src="/js/community.js?v=2"></script>
+<!-- ★ 식단표·밀박스 · 미태그 식사등록 · 외부인 식사신청 (QR 생성기 포함) — community.js 다음, admin.js 앞 -->
+<script src="/js/meal.js?v=2"></script>
+<!-- 관리자 모드 · 일반 화면 설정 버튼 숨김 (반드시 맨 마지막) -->
+<script src="/js/admin.js?v=2"></script>
 </body>
 </html>
