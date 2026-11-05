@@ -848,3 +848,120 @@ window.MiniQR = window.MiniQR || (function () {
   show(new URLSearchParams(location.search).get("tab") === "guest" ? "guest" : "untag");
 })();
 
+
+/* ============================================================
+   ★ 관리자 > 외부인 식사신청 : [이번 달] 버튼 · [⬇ 엑셀 다운로드] (meal.js v7.2 추가분 · meal.js 맨 끝에 붙여넣기)
+   · [이번 달] : 식사일자 칸에 이번 달 1일 ~ 말일이 들어가고 바로 조회
+   · [엑셀 다운로드] : 지금 표에 보이는 조건(전체/대기/승인 + 식사일자 기간) 그대로 .xlsx 저장
+   ============================================================ */
+(function () {
+  "use strict";
+  if (window.__gmExportInstalled) return;
+  window.__gmExportInstalled = true;
+
+  /* 관리자 조회 때 쓴 인증코드를 기억 (다운로드 때 다시 묻지 않도록) */
+  let lastCode = null;
+  const prevFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    try {
+      const url = typeof input === "string" ? input : input.url;
+      if (/\/api\/guest-meal\/admin\//.test(url) && init && init.body) { const b = JSON.parse(init.body); if (b.code) lastCode = b.code; }
+    } catch (e) {}
+    return prevFetch(input, init);
+  };
+
+  const kstToday = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+  const dt = (iso) => { try { return iso ? new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : ""; } catch (e) { return ""; } };
+  const say = (msg, type) => { const el = document.getElementById("gmAdminStatus"); if (el) el.innerHTML = `<div class="status-msg ${type}">${escapeHtml(msg)}</div>`; };
+
+  function addButtons() {
+    const filter = document.querySelector("#guestAdminBody .gm-date-filter");
+    if (!filter || filter.querySelector("#gmThisMonth")) return;
+    const clear = filter.querySelector("#gmDateClear");
+    const month = document.createElement("button");
+    month.type = "button"; month.id = "gmThisMonth"; month.className = "btn btn-ghost btn-sm"; month.textContent = "이번 달";
+    (clear || filter.lastChild).before(month);
+    month.addEventListener("click", () => {
+      const t = kstToday(), [y, m] = t.split("-").map(Number);
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const from = document.getElementById("gmFrom"), to = document.getElementById("gmTo");
+      from.value = t.slice(0, 8) + "01"; to.value = t.slice(0, 8) + String(last).padStart(2, "0");
+      to.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const refresh = document.getElementById("gmRefresh");
+    if (refresh && !document.getElementById("gmExportBtn")) {
+      const ex = document.createElement("button");
+      ex.type = "button"; ex.id = "gmExportBtn"; ex.className = "btn btn-primary btn-sm"; ex.textContent = "⬇ 엑셀 다운로드";
+      refresh.after(ex);
+      ex.addEventListener("click", exportGuest);
+    }
+  }
+  const body = document.getElementById("guestAdminBody");
+  if (body) new MutationObserver(addButtons).observe(body, { childList: true, subtree: true });
+  addButtons();
+
+  async function exportGuest() {
+    const code = window.__adminCode || lastCode;
+    if (!code) { say("인증 후 다운로드할 수 있습니다.", "error"); return; }
+    let items;
+    try { items = (await apiPost("/guest-meal/admin/list", { code })).items || []; }
+    catch (err) { say("불러오지 못했습니다: " + err.message, "error"); return; }
+    const seg = document.querySelector("#guestAdminBody .gm-seg button.active");
+    const f = seg ? seg.dataset.f : "all";
+    const from = (document.getElementById("gmFrom") || {}).value || "", to = (document.getElementById("gmTo") || {}).value || "";
+    const rows = items.filter((r) => (f === "all" || (f === "approved" ? r.status === "approved" : r.status !== "approved"))
+      && (!from || (r.mealDate || "") >= from) && (!to || (r.mealDate && r.mealDate <= to)))
+      .sort((a, b) => ((a.mealDate || "") === (b.mealDate || "") ? (a.createdAt < b.createdAt ? -1 : 1) : ((a.mealDate || "") < (b.mealDate || "") ? -1 : 1)));
+    if (!rows.length) { say("다운로드할 신청 건이 없습니다.", "error"); return; }
+    const head = ["식사일자", "신청시간", "사번", "이름", "부서", "외부업체", "식사인원수", "방문사유", "승인여부", "승인시간"];
+    const data = rows.map((r) => [r.mealDate || "", dt(r.createdAt), r.empNo, r.name, r.dept, r.company, Number(r.count) || 0, r.reason,
+      r.status === "approved" ? "승인" : "대기", dt(r.approvedAt)]);
+    const total = rows.reduce((a, r) => a + (Number(r.count) || 0), 0);
+    data.push(["합계", "", "", "", "", `${rows.length}건`, total, "", "", ""]);
+    const label = f === "approved" ? "_승인" : f === "pending" ? "_대기" : "";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(makeXlsx("외부인 식사신청", head, data));
+    a.download = `외부인식사신청_${from || "전체"}${to ? "~" + to : ""}${label}.xlsx`;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    say(`${rows.length}건(식사 인원 ${total}명)을 엑셀로 내보냈습니다.`, "success");
+  }
+
+  /* xlsx 만들기 (외부 라이브러리 없음) */
+  function makeXlsx(sheetName, header, data) {
+    const x = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const col = (i) => String.fromCharCode(65 + i);
+    const cell = (v, ref, s) => typeof v === "number"
+      ? `<c r="${ref}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>`
+      : `<c r="${ref}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
+    const row = (cells, r, s) => `<row r="${r}">${cells.map((v, i) => cell(v, col(i) + r, s)).join("")}</row>`;
+    const widths = [12, 18, 12, 10, 14, 18, 11, 36, 9, 18];
+    const lastCol = col(header.length - 1), n = data.length + 1;
+    const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${row(header, 1, 1)}${data.map((d, i) => row(d, i + 2, i === data.length - 1 ? 1 : 0)).join("")}</sheetData><autoFilter ref="A1:${lastCol}${n - 1}"/></worksheet>`;
+    const files = {
+      "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+      "_rels/.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+      "xl/workbook.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${x(sheetName)}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${x(sheetName)}'!$A$1:$${lastCol}$${n - 1}</definedName></definedNames></workbook>`,
+      "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+      "xl/styles.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7E9E9"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>`,
+      "xl/worksheets/sheet1.xml": sheet };
+    const enc = new TextEncoder(), parts = [], central = []; let offset = 0;
+    const T = new Uint32Array(256); for (let k = 0; k < 256; k++) { let c = k; for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[k] = c >>> 0; }
+    const crc32 = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = T[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    for (const [name, text] of Object.entries(files)) {
+      const nb = enc.encode(name), db = enc.encode(text), crc = crc32(db);
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(12, 0x21, true);
+      lh.setUint32(14, crc, true); lh.setUint32(18, db.length, true); lh.setUint32(22, db.length, true); lh.setUint16(26, nb.length, true);
+      parts.push(new Uint8Array(lh.buffer), nb, db);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(14, 0x21, true);
+      ch.setUint32(16, crc, true); ch.setUint32(20, db.length, true); ch.setUint32(24, db.length, true); ch.setUint16(28, nb.length, true); ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), nb); offset += 30 + nb.length + db.length;
+    }
+    const cd = central.reduce((a, b) => a + b.length, 0), end = new DataView(new ArrayBuffer(22)), cnt = Object.keys(files).length;
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, cnt, true); end.setUint16(10, cnt, true); end.setUint32(12, cd, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+})();
+
+
