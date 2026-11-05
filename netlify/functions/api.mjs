@@ -17,8 +17,10 @@
 //   일별 기록(daily)을 쌓아두고, 조회 시 일/주/월 단위로 묶어서 제공합니다.
 //
 // [v6 변경] 외부인 식사신청: 식사일자(mealDate) 추가 · 관리자 삭제 기능 · 알림 메일 기능 제거
+// [v7 변경] 샐러드 댓글 비밀번호 4자리 (comment-pw 에 해시로 보관) · 비밀번호/관리자 인증코드로 삭제
 
 import { getStore } from "@netlify/blobs";
+import { createHash, randomBytes } from "node:crypto";
 
 const MAX_NEWS_SLIDES = 50;
 const DEFAULT_CODE = "1234";
@@ -451,6 +453,9 @@ async function handleNewsSlides(req, url, store, imageStore, subpath) {
 /* ============================================================
    댓글 / 갤러리 / 사이트설정 / 섹션제목 / 인증
    ============================================================ */
+/* 댓글 — 작성 시 비밀번호 4자리(해시로 별도 보관) · 삭제는 그 비밀번호 또는 관리자 인증코드 */
+const PW_MAX_FAIL = 5, PW_LOCK_MS = 10 * 60 * 1000;
+function hashPw(salt, pw) { return createHash("sha256").update(`${salt}:${pw}`).digest("hex"); }
 async function handleComments(req, url, store) {
   if (req.method === "GET") {
     const feedKey = url.searchParams.get("feedKey");
@@ -463,23 +468,46 @@ async function handleComments(req, url, store) {
     const body = await readBody(req);
     if (!body.feedKey || !body.itemId) return err("feedKey와 itemId가 필요합니다.", 400);
     if (!body.text || !body.text.trim()) return err("댓글 내용을 입력해주세요.", 400);
+    const password = String(body.password || "");
+    if (!/^\d{4}$/.test(password)) return err("댓글 비밀번호를 숫자 4자리로 입력해주세요.", 400);
     const all = await readJSON(store, "comments", []);
     const newComment = {
       id: uid(), feedKey: body.feedKey, itemId: body.itemId,
-      author: (body.author || "").trim() || "익명",
-      text: body.text.trim(), date: new Date().toISOString(),
+      author: (body.author || "").trim().slice(0, 20) || "익명",
+      text: body.text.trim().slice(0, 1000), date: new Date().toISOString(),
     };
     all.push(newComment);
     await store.setJSON("comments", all);
+    const pws = await readJSON(store, "comment-pw", {});
+    const salt = randomBytes(8).toString("hex");
+    pws[newComment.id] = { salt, hash: hashPw(salt, password), fails: 0, lockUntil: 0 };
+    await store.setJSON("comment-pw", pws);
     return json(newComment, 201);
   }
   if (req.method === "DELETE") {
     const id = url.searchParams.get("id");
-    const code = url.searchParams.get("code");
-    if (!(await verifyCode(store, code))) return err("인증코드가 올바르지 않습니다.", 401);
+    const code = String(url.searchParams.get("code") || "").trim();
     if (!id) return err("id가 필요합니다.", 400);
+    if (!code) return err("비밀번호를 입력해주세요.", 400);
     const all = await readJSON(store, "comments", []);
+    if (!all.some((c) => c.id === id)) return err("이미 삭제되었거나 없는 댓글입니다.", 404);
+    const pws = await readJSON(store, "comment-pw", {});
+    const p = pws[id];
+    const locked = !!(p && p.lockUntil && Date.now() < p.lockUntil);
+    let ok = await verifyCode(store, code);                 // 관리자 인증코드
+    if (!ok && p && !locked && /^\d{4}$/.test(code)) ok = hashPw(p.salt, code) === p.hash;
+    if (!ok) {
+      if (locked) return err(`비밀번호를 여러 번 틀려 ${Math.ceil((p.lockUntil - Date.now()) / 60000)}분 뒤에 다시 시도할 수 있습니다.`, 429);
+      if (p) {
+        p.fails = (p.fails || 0) + 1;
+        if (p.fails >= PW_MAX_FAIL) { p.fails = 0; p.lockUntil = Date.now() + PW_LOCK_MS; }
+        await store.setJSON("comment-pw", pws);
+        return err("비밀번호가 올바르지 않습니다.", 401);
+      }
+      return err("비밀번호가 없는 예전 댓글입니다. 관리자 인증코드로만 삭제할 수 있습니다.", 401);
+    }
     await store.setJSON("comments", all.filter((c) => c.id !== id));
+    if (p) { delete pws[id]; await store.setJSON("comment-pw", pws); }
     return json({ ok: true });
   }
   return err("지원하지 않는 요청입니다.", 405);
