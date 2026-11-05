@@ -757,3 +757,94 @@ window.MiniQR = window.MiniQR || (function () {
   loadMealPhotos();
   loadToday();
 })();
+
+
+/* ============================================================
+   ★ QR 등록 화면 탭 (meal.js v7.1 추가분 · meal.js 맨 끝에 붙여넣기)
+   ------------------------------------------------------------
+   · QR 주소(사이트주소/?untag=1)로 들어오면 카드 맨 위에
+     [🪪 사원증 미태그] [🍽 외부인 식사 신청] 선택 버튼이 생김
+   · 버튼을 누르면 그에 맞는 입력 화면으로 바뀜
+   · 외부인 탭으로 바로 여는 주소: 사이트주소/?untag=1&tab=guest
+   ============================================================ */
+(function () {
+  "use strict";
+  if (window.__qrTabsInstalled) return;
+  if (!new URLSearchParams(location.search).has("untag")) return;   // QR 주소일 때만
+  const untagPopup = document.getElementById("untagPopup");
+  const guestModal = document.getElementById("guestMealModal");
+  const openBtn = document.getElementById("gmOpenBtn");
+  if (!untagPopup || !guestModal || !openBtn) return;
+  window.__qrTabsInstalled = true;
+
+  /* 화면 스타일 */
+  const css = document.createElement("style");
+  css.textContent = `
+    .qr-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; background: #fff; border-bottom: 1px solid var(--border); }
+    .qr-tabs button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; border: 1.5px solid var(--border); background: #FAF8F6; color: var(--text-muted); border-radius: 11px; font-size: 14.5px; font-weight: 800; font-family: inherit; cursor: pointer; }
+    .qr-tabs button.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 3px 10px rgba(156,30,34,.25); }
+    html body.untag-only.qr-guest > #untagPopup { display: none !important; }
+    html body.untag-only.qr-guest > #guestMealModal {
+      display: flex !important; position: static; background: transparent; inset: auto;
+      padding: 24px 14px calc(24px + env(safe-area-inset-bottom));
+      min-height: 100vh; min-height: 100dvh; align-items: center; justify-content: center; overflow: visible;
+    }
+    body.untag-only #guestMealModal .modal-box, body.untag-only #untagPopup .modal-box { max-width: 460px; }
+    body.untag-only #guestMealModal .modal-box { box-shadow: 0 10px 34px rgba(43,36,34,.15); margin: 0 auto; max-height: none; overflow: visible; }
+    body.untag-only #guestMealModal .modal-close { display: none; }
+    @media (max-width: 640px) {
+      html body.untag-only.qr-guest > #guestMealModal { align-items: flex-start; padding: 10px 8px calc(24px + env(safe-area-inset-bottom)); }
+      body.untag-only #untagPopup { align-items: flex-start; padding-top: 10px; }
+      .qr-tabs button { font-size: 13.5px; }
+    }`;
+  document.head.appendChild(css);
+
+  /* 선택 버튼 */
+  const tabs = document.createElement("div");
+  tabs.className = "qr-tabs"; tabs.setAttribute("role", "tablist");
+  tabs.innerHTML = `
+    <button type="button" role="tab" data-qr="untag">🪪 사원증 미태그</button>
+    <button type="button" role="tab" data-qr="guest">🍽 외부인 식사 신청</button>`;
+
+  let mode = null;
+  function show(next) {
+    if (mode === next) return;
+    mode = next;
+    const box = (next === "guest" ? guestModal : untagPopup).querySelector(".modal-box");
+    box.prepend(tabs);                                   // 지금 보이는 카드 맨 위로 이동
+    tabs.querySelectorAll("button").forEach((b) => {
+      const on = b.dataset.qr === next; b.classList.toggle("active", on); b.setAttribute("aria-selected", on);
+    });
+    document.body.classList.toggle("qr-guest", next === "guest");
+    if (next === "guest") {
+      openBtn.click();                                   // 신청 화면 초기화 (식사일자 = 오늘)
+      setTimeout(() => { const a = document.activeElement; if (a && a.blur) a.blur(); }, 120);   // 모바일 키보드 자동으로 안 뜨게
+      document.title = "외부인 식사 신청";
+    } else {
+      document.title = "사원증 미태그 식사등록";
+    }
+    document.body.classList.remove("modal-open");
+    const u = new URL(location.href);
+    if (next === "guest") u.searchParams.set("tab", "guest"); else u.searchParams.delete("tab");
+    history.replaceState(null, "", u);
+    window.scrollTo(0, 0);
+  }
+  tabs.addEventListener("click", (e) => { const b = e.target.closest("[data-qr]"); if (b) show(b.dataset.qr); });
+
+  /* 외부인 신청 화면: 닫히지 않게 유지 · [확인]을 누르면 새 신청 화면으로 */
+  new MutationObserver(() => {
+    if (mode === "guest" && !guestModal.classList.contains("open")) guestModal.classList.add("open");
+  }).observe(guestModal, { attributes: true, attributeFilter: ["class"] });
+  const doneBtn = document.getElementById("gmDoneClose");
+  if (doneBtn) {
+    doneBtn.textContent = "새로 신청하기";
+    doneBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopImmediatePropagation();
+      openBtn.click(); window.scrollTo(0, 0);
+    }, true);
+  }
+  guestModal.addEventListener("click", (e) => { if (e.target === guestModal) e.stopImmediatePropagation(); }, true);   // 바깥 눌러도 안 닫힘
+
+  show(new URLSearchParams(location.search).get("tab") === "guest" ? "guest" : "untag");
+})();
+
