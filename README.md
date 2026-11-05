@@ -1,75 +1,55 @@
-# R&D본부 소식지 (서버 연동 버전)
+R&D본부 소식지 — 테스트 사이트 (GitHub + Netlify)
+=================================================
+이 폴더 전체가 하나의 GitHub 저장소가 됩니다. (운영 사이트와 데이터가 완전히 분리됨)
 
-이 버전은 이전의 "브라우저에만 저장" 방식과 달리, **Netlify Functions + Netlify Blobs**라는
-서버 저장소를 사용합니다. 즉, 누군가 소식지나 사진을 수정하면 **다른 모든 방문자에게도
-새로고침 즉시 동일하게 반영**됩니다.
+[폴더 구조]
+  netlify.toml                    Netlify 설정 (화면 폴더 = public, 서버 폴더 = netlify/functions)
+  package.json                    서버가 쓰는 저장소 라이브러리(@netlify/blobs) 목록
+  public/index.html               화면
+  public/css/style.css, meal.css
+  public/js/app.js, news-enhance.js, community.js, meal.js, admin.js
+  netlify/functions/api.mjs       서버: 소식지·샐러드·조회수·식단사진·미태그·외부인신청
+  netlify/functions/community.mjs 서버: 공지·설문·좋아요
 
-## 주요 기능 (기존과 동일, 저장 방식만 서버로 전환)
-- 중식 샐러드 신청공간 / 소식지: 목록·검색·상세보기, 댓글(누구나 작성 가능)
-- 소식지: 이미지 슬라이더 (최대 20장, 넘겨보기 + 라이트박스 갤러리 모드)
-- 식단표 / 밀박스: 사진 1장만 유지, 새로 올리면 자동 교체
-- 사이트 꾸미기: 프로필 사진, 배경 사진(위치·확대 조정 슬라이더 포함) — 설정 화면에서만 변경
-- 섹션 제목 커스터마이즈
-- 인증코드: 작성/삭제/설정 변경 시 필요. 변경하려면 **현재 코드를 먼저 입력**해야 함 (서버에서 검증)
-- 기본 인증코드: `1234` (배포 후 설정 화면에서 꼭 변경하세요)
+[1] GitHub 저장소 만들기
+  1. github.com 로그인 → 오른쪽 위 [+] → New repository
+  2. 이름: rnd-newsletter-test  / Private 선택 / 나머지 그대로 → Create repository
+  3. 만들어진 화면에서 "uploading an existing file" 클릭
+  4. 압축을 푼 폴더 안의 내용물(netlify.toml, package.json, public 폴더, netlify 폴더)을
+     전부 선택해서 브라우저 창으로 끌어다 놓기  ※ zip 파일 자체를 올리면 안 됩니다
+     ※ .gitignore 는 숨김파일이라 안 보여도 괜찮습니다
+  5. 아래 [Commit changes] 클릭
+  6. 저장소 첫 화면에서 public, netlify 폴더가 보이는지 확인
 
-## 폴더 구조
-```
-rnd-newsletter-server/
-├─ netlify.toml
-├─ package.json
-├─ netlify/functions/
-│  └─ api.mjs          # 모든 API(/api/*)를 처리하는 서버 함수
-└─ public/
-   ├─ index.html
-   ├─ css/style.css
-   └─ js/app.js         # 서버 API와 통신하는 프론트엔드 로직
-```
+[2] Netlify 와 연결
+  1. app.netlify.com 로그인 → Add new site(Add new project) → Import an existing project
+  2. GitHub 선택 → 권한 허용 → rnd-newsletter-test 선택
+     (저장소가 안 보이면 "Configure the Netlify app on GitHub" 에서 이 저장소 접근 허용)
+  3. 설정 화면: Branch = main, Build command = 비움, Publish directory = public
+     (netlify.toml 이 있어서 자동으로 채워집니다) → Deploy
+  4. 1~2분 뒤 Deploys 가 Published 가 되면 https://○○○.netlify.app 주소로 접속
+  5. Site configuration > Site details > Change site name 에서 주소 이름 변경 가능
+     (예: rnd-newsletter-test.netlify.app)
 
-## 🚀 GitHub 연동으로 배포하기 (권장 — 이후엔 파일만 올리면 자동 반영)
+[3] 외부인 식사신청 메일 알림 켜기 (Netlify Forms)
+  1. 사이트 > Forms > [Enable form detection] 클릭
+  2. Deploys > Trigger deploy > Deploy site  (폼을 인식시키려면 한 번 더 배포 필요)
+  3. Forms 목록에 guest-meal-notify 가 생겼는지 확인
+  4. Site configuration > Notifications > Emails and webhooks
+     > Form submission notifications > Add notification > Email notification
+     · Email to notify: 20220412@lottechem.com   · Form: guest-meal-notify → Save
+  5. 사이트에서 외부인 식사 신청 1건 → 메일 확인 (스팸함도 확인)
+     · 발신자: formresponses@netlify.com
+     · 메일 안의 adminLink 주소를 누르면 관리자 로그인 후 '외부인 식사신청' 탭이 열림
+  (선택) 메일 디자인/제목을 직접 정하고 싶으면 Resend 사용:
+     Site configuration > Environment variables > RESEND_API_KEY 추가 후 다시 배포
 
-### 1단계. GitHub에 저장소 만들고 파일 올리기
-1. [github.com](https://github.com) 로그인 → 우측 상단 **+ → New repository**
-2. 저장소 이름 예: `rnd-newsletter` → **Create repository**
-3. 이 폴더(`rnd-newsletter-server`) 안의 모든 파일을 그 저장소에 업로드합니다.
-   - 웹 브라우저에서 바로 하려면: 저장소 페이지 → **Add file → Upload files** → 이 폴더의 파일/폴더를 전부 드래그 앤 드롭 → **Commit changes**
-   - (폴더 구조가 그대로 유지되어야 합니다: `netlify/functions/api.mjs`, `public/index.html` 등)
+[4] 이후 수정 방법
+  GitHub 에서 파일 수정 → Commit → Netlify 가 자동으로 다시 배포 (1~2분)
+  화면이 안 바뀌면 Ctrl+F5, 그래도 안 되면 index.html 의 ?v= 숫자를 올려서 커밋
 
-### 2단계. Netlify와 연결
-1. [app.netlify.com](https://app.netlify.com) 로그인
-2. **Add new site → Import an existing project** 클릭
-3. **GitHub** 선택 → 방금 만든 저장소(`rnd-newsletter`) 선택
-4. Build 설정은 `netlify.toml`에 이미 다 적혀있어서 별도 입력 없이 **Deploy site** 버튼만 누르면 됩니다.
-5. 잠시 후 `https://[사이트이름].netlify.app` 주소가 생성됩니다. 이 주소를 팀에 공유하면 끝!
-
-### 3단계. 이후 내용을 수정하고 싶을 때
-- 코드를 직접 고칠 필요는 거의 없습니다 — **사이트 자체(소식지 글쓰기, 사진 업로드 등)는 브라우저에서 그대로 하시면 됩니다.** 이건 이제 서버에 저장되므로 자동으로 모두에게 공유됩니다.
-- 디자인이나 기능 자체를 바꾸고 싶을 때만 GitHub 저장소의 파일을 수정하면, Netlify가 자동으로 다시 배포합니다.
-
-## ⚠️ 배포 후 꼭 하실 것: 인증코드 변경
-1. 사이트 우측 상단 **⚙ 설정 → 인증코드 변경** 탭
-2. 현재 인증코드(`1234`)를 입력하고, 원하는 새 코드로 변경
-3. 이 코드는 서버(Netlify Blobs)에 저장되므로, 이후 접속하는 모든 관리자가 새 코드를 사용해야 합니다.
-
-## 데이터는 어디에 저장되나요?
-**Netlify Blobs**라는, Netlify가 무료로 제공하는 서버 저장소에 저장됩니다.
-- 별도의 데이터베이스 계정을 만들 필요가 없습니다.
-- 사이트를 재배포해도 데이터는 유지됩니다.
-- 이전 버전(`SEED_DATA` 복사/붙여넣기 방식)처럼 수동으로 동기화할 필요가 전혀 없습니다 — 이게 이번 버전으로 바꾼 핵심 이유입니다.
-
-## 로컬에서 테스트하려면 (선택사항)
-```bash
-npm install -g netlify-cli
-cd rnd-newsletter-server
-npm install
-netlify dev
-```
-`netlify dev`는 Netlify Functions와 Blobs를 로컬에서도 그대로 에뮬레이션하므로, 배포 전에 미리 테스트해볼 수 있습니다 (http://localhost:8888).
-
-## 자주 묻는 질문
-
-**Q. 사내망에서 GitHub나 Netlify 작업을 했는데, 핸드폰에서도 접속되나요?**
-A. 네, 100% 됩니다. GitHub·Netlify는 배포 과정에서만 사용하는 도구이고, 일단 배포가 완료되면 사이트는 Netlify의 전 세계 공용 서버에서 실행됩니다. 사내망 여부와 무관하게 인터넷이 되는 곳이면 어디서든 (핸드폰 포함) 접속 가능합니다.
-
-**Q. 예전 파일(브라우저 저장 방식)에서 쓰던 소식지/사진 내용을 옮길 수 있나요?**
-A. 예전 파일은 각 브라우저 안에만 데이터가 있어서 자동으로 옮겨지진 않습니다. 필요하시면 예전 내용을 다시 입력해주시거나, 저에게 예전 파일의 SEED 코드를 알려주시면 이 서버 버전에 맞게 옮겨드릴 수 있습니다.
+[주소 정리]
+  일반 화면          https://사이트주소/
+  관리자             https://사이트주소/?admin            (처음 인증코드 1234)
+  외부인 신청 관리   https://사이트주소/?admin=guest
+  미태그 등록 팝업   https://사이트주소/?untag=1           (QR코드용)
