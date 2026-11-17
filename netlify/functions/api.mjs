@@ -17,6 +17,7 @@
 //   일별 기록(daily)을 쌓아두고, 조회 시 일/주/월 단위로 묶어서 제공합니다.
 //
 // [v6 변경] 외부인 식사신청: 식사일자(mealDate) 추가 · 관리자 삭제 기능 · 알림 메일 기능 제거
+// [v8 변경] 외부인 식사신청 알림 메일 재도입 — Netlify Forms(guest-meal-notify) 제출 시 이메일 알림 (프론트 meal.js)
 // [v7 변경] 샐러드 댓글 비밀번호 4자리 (comment-pw 에 해시로 보관) · 비밀번호/관리자 인증코드로 삭제
 
 import { getStore } from "@netlify/blobs";

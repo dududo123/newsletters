@@ -522,6 +522,7 @@ window.MiniQR = window.MiniQR || (function () {
     try {
       const r = await apiPost("/guest-meal", v);
       window.__gmNewId = r.id;
+      notifyGuestMeal(v);
             $("#gmDoneMsg").textContent = `${v.name}님, 외부인 식사 신청이 완료되었습니다.`;
       $("#gmDoneSub").textContent = `식사일자 ${mealDateOf(v.mealDate)} · 관리자가 승인하면 목록의 '승인여부'가 바뀝니다.`;
       $("#gmForm").hidden = true; $("#gmDone").hidden = false;
@@ -530,6 +531,23 @@ window.MiniQR = window.MiniQR || (function () {
     } catch (err) { fail(err.message); }
     finally { btn.disabled = false; btn.textContent = "신청하기"; }
   });
+
+  /* ★ 외부인 식사신청 알림 메일 (Netlify Forms → 관리자 이메일 알림) — 실패해도 신청 자체에는 영향 없음 */
+  function notifyGuestMeal(v) {
+    try {
+      const body = new URLSearchParams({
+        "form-name": "guest-meal-notify",
+        subject: "[외부인 식사신청] 새 신청이 접수되었습니다",
+        "bot-field": "",
+        name: v.name, empNo: v.empNo, dept: v.dept, company: v.company,
+        count: String(v.count), mealDate: v.mealDate, reason: v.reason,
+        createdAt: new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
+        adminLink: guestAdminUrl(),
+      });
+      fetch("/", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString() })
+        .catch(() => {});
+    } catch (_) { /* 무시 */ }
+  }
 
   /* 관리: 외부인 식사신청 탭 */
   let gmAdminCode = null, gmRows = [], gmFilter = "all";
