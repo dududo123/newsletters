@@ -245,9 +245,11 @@
   </div>
 </div>
 <!-- ★ 외부인 식사신청 알림 메일용 (Netlify Forms 가 이 폼을 인식해서 메일 알림을 보냄 · 화면에는 안 보임) -->
-<form name="guest-meal-notify" data-netlify="true" netlify-honeypot="bot-field" hidden>
-  <input name="bot-field"><input name="empNo"><input name="name"><input name="dept"><input name="company">
-  <input name="count"><textarea name="reason"></textarea><input name="createdAt"><input name="adminLink">
+<form name="guest-meal-notify" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input type="hidden" name="form-name" value="guest-meal-notify">
+  <input type="hidden" name="subject" value="[외부인 식사신청] 새 신청이 접수되었습니다">
+  <input name="name"><input name="bot-field"><input name="empNo"><input name="dept"><input name="company">
+  <input name="count"><input name="mealDate"><textarea name="reason"></textarea><input name="createdAt"><input name="adminLink">
 </form>
 <!-- 소식지 사진 추가 모달 -->
 <div class="modal-overlay" id="newsUploadModal">
